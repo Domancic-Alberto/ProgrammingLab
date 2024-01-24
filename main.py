@@ -1,0 +1,2 @@
+print("amedeojjj")
+print("  \ngg");
