@@ -5,22 +5,21 @@ class ExamException(Exception):
   pass
 class CSVTimeSeriesFile:
     def __init__(self, name):
-        self.name=name
-        self.anno_min=1949
-        self.anno_max=1960
-        self.intestazione=""
-        #self.riga=[]
+        self.name=name #nome File .csv
+        self.anno_min=1949 #valore minimo intervallo date
+        self.anno_max=1960 #valore massimo intervallo date
+        self.intestazione="" #inizializzo stringa per salvare intestazione
         self.lista_completa = [] #inizializzo una lista vuota per salvare i valori
 #---------
-    def check_data(self,data):
-        reverse=False
-        data_filtrato=""
+    def check_data(self,data):#metodo creato per filtrare la data in ingresso
+        reverse=False#booleano utilizzato per invertire anno e mese se necessario
+        data_filtrato=""#variabile per la lista filtrata
         anno=0
         mese=0
         if data!= '':
-            if '-' not in data:#se non contiene -
+            if '-' not in data:#se non contiene '-' controllo effettuato in cui la data abbia solo anno e non mese
                 if data.isdigit()==True:#controllo che stringa abbia solo caratteri numerici
-                    if self.anno_min <= int(data) <= self.anno_max:
+                    if self.anno_min <= int(data) <= self.anno_max:#verifico che stia nell'intervallo desiderato
                         anno=int(data)
                         mese=0
                         data_filtrato=str(anno)+"-0"
@@ -31,17 +30,17 @@ class CSVTimeSeriesFile:
             else:
                 elem=data.split('-')
                 if elem[0].isdigit()==True:#controllo che stringa abbia solo caratteri numerici
-                    if self.anno_min <= int(elem[0]) <= self.anno_max:
+                    if self.anno_min <= int(elem[0]) <= self.anno_max: #controllo se primo elemento è l'anno
                         anno=int(elem[0])
-                    elif 1 <= int(elem[0]) <= 12:
+                    elif 1 <= int(elem[0]) <= 12: #controllo se primo elemento per sbaglio è un mese
                         mese=int(elem[0])
                         reverse=True
                 else:
                     pass #non è un elemento numerico
                 if elem[1].isdigit()==True :#controllo che stringa abbia solo caratteri numerici
-                    if 1 <= int(elem[1]) <= 12:
+                    if 1 <= int(elem[1]) <= 12:#controllo se secondo elemento è un mese
                         mese=int(elem[1])
-                    elif self.anno_min <= int(elem[1]) <= self.anno_max and reverse==True:
+                    elif self.anno_min <= int(elem[1]) <= self.anno_max and reverse==True:#controllo se per sbaglio è un anno
                         anno=int(elem[1])
                         reverse=False
                     else:
@@ -49,8 +48,6 @@ class CSVTimeSeriesFile:
                         anno=0
                 else:
                     pass #non è un elemento numerico
-                if mese==-90:
-                    anno=0
                 if(mese<=9):#font
                     data_filtrato=str(anno)+"-0"+str(mese)
                 else:
@@ -59,6 +56,7 @@ class CSVTimeSeriesFile:
         else:
             pass#la riga contiene lettere o caratteri speciali
         return data_filtrato
+#---------
     def check_pass(self,passeggeri):
         passeggeri_filtrato=0
         if passeggeri!= '':
@@ -68,9 +66,22 @@ class CSVTimeSeriesFile:
         else:
             pass#la riga contiene lettere o caratteri speciali
         return passeggeri_filtrato
-    
-    
 #---------
+    def check_riga_duplicata(self,lista_completa):#metodo che controlla se ci sono righe duplicate
+        copia_lista_completa = []
+        for riga in lista_completa:
+            if riga in copia_lista_completa:#se riga già presente alzo eccezione
+                raise ValueError("Errore: Riga duplicata trovata.")
+            copia_lista_completa.append(riga)
+        return lista_completa
+#---------
+    def check_ordine_lista(self,lista_completa):#metodo per verificare se lista ha elementi non in ordine cronologico
+        for i in range(1, len(lista_completa)):
+            data_attuale = lista_completa[i][0]
+            data_prec = lista_completa[i - 1][0]
+            if data_attuale <= data_prec:#se data attuale < di precedente alzo eccezione
+                raise ExamException("Errore: Lista non ordinata in ordine cronologico.")
+        return lista_completa
     def get_data(self):
         riga=[]
         try:
@@ -84,7 +95,7 @@ class CSVTimeSeriesFile:
             elementi = line.strip().split(',') #faccio lo split di ogni riga sulla virgola
             if elementi[0].lower() != 'date': #se NON sto processando l’intestazione
                 data = elementi[0] #salvo elemento 0 in variabile data
-                if self.check_data(data) not in ['', '0-00', '0-0']:
+                if self.check_data(data) not in ['', '0-00', '0-0','0-01','0-02','0-03','0-04','0-05','0-06','0-07','0-08','0-09','0-10','0-11','0-12']:#filtro valori resituiti dalla funzione non accettati
                     data=self.check_data(data)
                     if self.check_pass(elementi[1])!=0:
                         passeggeri=self.check_pass(elementi[1]) #salvo elemento 1 in variabile passeggeri
@@ -98,6 +109,8 @@ class CSVTimeSeriesFile:
             else:
                 self.intestazione=[elementi[0],elementi[1]]#salvo intestazione in lista intestazione
         my_file.close()
+        self.lista_completa=self.check_riga_duplicata(self.lista_completa)
+        self.lista_completa=self.check_ordine_lista(self.lista_completa)
         return self.lista_completa
 
 def compute_increments(time_series, first_year, last_year):
@@ -122,33 +135,19 @@ def compute_increments(time_series, first_year, last_year):
         media=somma_pass/n_mesi
         db[anno].append(media)#aggiungo media alla fine del dizionario #chiave: [t_passeggeri,n_mesi,media]
 
-    #-----
-    arr_anno_media=[]
-    #creo un array bidimensionale per salvare anno e media
+    arr_anno_media=[]#creo un array bidimensionale per salvare anno e media
     for anno, (somma_pass, n_mesi, media) in db.items():
         arr_anno_media.append([anno, media])
 
-    
-    print(db.items())
-    if first_year in db.keys() and last_year in db.keys():#controlla che i last_year e first_year siano all'interno del dizionario quindi all'interno della lista quindi preenti nel CSV file
+    if first_year in db.keys() and last_year in db.keys():#controlla che i last_year e first_year siano all'interno del dizionario quindi all'interno della lista quindi presenti nel CSV file
         diff_dict = {}
         for i in range(len(arr_anno_media) - 1):
             anno1, media1 = arr_anno_media[i]
             anno2, media2 = arr_anno_media[i + 1]
-            if first_year <= anno1 <= last_year and first_year <= anno2 <= last_year:#taglia valori fuori dall intervallo first_year-last_year
+            if first_year <= anno1 <= last_year and first_year <= anno2 <= last_year:#taglia valori fuori dall'intervallo first_year-last_year
                 key = f"{anno1}-{anno2}"#calcolo differenza tra medie e le salvo in un dizionario
                 diff_dict[key] = round(media1 - media2, 3)
-
-        print(diff_dict.items())
         return diff_dict
     else:
         raise ExamException(f"Errore, first o last year {first_year}, {last_year} presi come parametri dalla funzione non presenti nel CSV File")
         return {}
-
-#main
-time_series_file = CSVTimeSeriesFile('data.csv')
-time_series = time_series_file.get_data()
-print(time_series)
-#print(time_series_file.dividi_mese_anno())
-print("\n")
-print(compute_increments(time_series, "1949", "1958"))
